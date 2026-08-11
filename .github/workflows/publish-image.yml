@@ -1,5 +1,5 @@
 ---
-name: Publish Image
+name: Publish Image to GH Registry
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
         type: choice
         options:
           - linux/arm64
-          - linux/arm
+          - linux/amd64
 
 permissions:
   contents: read
