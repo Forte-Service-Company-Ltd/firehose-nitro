@@ -1,8 +1,6 @@
 // Copyright 2022-2026, Offchain Labs, Inc.
 // For license information, see https://github.com/OffchainLabs/nitro/blob/master/LICENSE.md
 
-use std::mem::MaybeUninit;
-
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::Bytes32;
@@ -18,14 +16,9 @@ pub fn keccak_seq(inputs: &[&[u8]]) -> Bytes32 {
     for input in inputs {
         h.update(input);
     }
-    // SAFETY: `&mut *out.as_mut_ptr()` produces a `&mut [u8; 32]`, coercing to a
-    // `&mut [u8]` of length 32. `Keccak::v256().finalize()` writes `output.len()`
-    // bytes, so all 32 bytes are initialized before `assume_init` is called.
-    unsafe {
-        let mut out = MaybeUninit::<[u8; 32]>::uninit();
-        h.finalize(&mut *out.as_mut_ptr());
-        out.assume_init().into()
-    }
+    let mut out = [0u8; 32];
+    h.finalize(&mut out);
+    out.into()
 }
 
 #[cfg(test)]

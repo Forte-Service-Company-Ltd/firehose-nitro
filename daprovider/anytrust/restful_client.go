@@ -45,12 +45,7 @@ func NewRestfulClientFromURL(url string) (*RestfulClient, error) {
 }
 
 func (c *RestfulClient) GetByHash(ctx context.Context, hash common.Hash) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.url+getByHashRequestPath+EncodeStorageServiceKey(hash), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := http.DefaultClient.Do(req)
+	res, err := doRestfulGet(ctx, c.url+getByHashRequestPath+EncodeStorageServiceKey(hash))
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +74,7 @@ func (c *RestfulClient) GetByHash(ctx context.Context, hash common.Hash) ([]byte
 }
 
 func (c *RestfulClient) HealthCheck(ctx context.Context) error {
-	res, err := http.Get(c.url + healthRequestPath)
+	res, err := doRestfulGet(ctx, c.url+healthRequestPath)
 	if err != nil {
 		return err
 	}
@@ -91,7 +86,7 @@ func (c *RestfulClient) HealthCheck(ctx context.Context) error {
 }
 
 func (c *RestfulClient) ExpirationPolicy(ctx context.Context) (anytrustutil.ExpirationPolicy, error) {
-	res, err := http.Get(c.url + expirationPolicyRequestPath)
+	res, err := doRestfulGet(ctx, c.url+expirationPolicyRequestPath)
 	if err != nil {
 		return -1, err
 	}
