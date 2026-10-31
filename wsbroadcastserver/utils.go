@@ -28,6 +28,12 @@ type chainedReader struct {
 	readers []io.Reader
 }
 
+// Feed subscribers do not submit application messages to the broadcaster.
+// Bound decoded client payloads, including compressed messages, before allocation grows.
+const maxClientMessageSize = 1 << 20
+
+var errClientMessageTooLarge = errors.New("client WebSocket message exceeds size limit")
+
 func logError(err error, msg string) {
 	if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 		log.Error(msg, "err", err)
@@ -49,7 +55,7 @@ func (cr *chainedReader) Read(b []byte) (n int, err error) {
 				continue // EOF and empty, skip to next
 			} else {
 				// The Read interface specifies some data can be returned along with an EOF.
-				if len(cr.readers) != 1 {
+				if len(cr.readers) > 0 {
 					// If this isn't the last reader, return the data without the EOF since this
 					// may not be the end of all the readers.
 					return n, nil
@@ -58,6 +64,9 @@ func (cr *chainedReader) Read(b []byte) (n int, err error) {
 			}
 		}
 		break
+	}
+	if len(cr.readers) == 0 && n == 0 {
+		return 0, io.EOF
 	}
 	return
 }
@@ -134,15 +143,20 @@ func ReadData(ctx context.Context, conn net.Conn, earlyFrameData io.Reader, time
 			}
 			continue
 		}
-		var data []byte
+		var payload io.Reader = &reader
 		if msg.IsCompressed() {
 			if !compression {
 				return nil, 0, errors.New("Received compressed frame even though compression extension wasn't negotiated")
 			}
 			flateReader.Reset(&reader)
-			data, err = io.ReadAll(flateReader)
-		} else {
-			data, err = io.ReadAll(&reader)
+			payload = flateReader
+		}
+		if state&ws.StateServerSide != 0 {
+			payload = io.LimitReader(payload, maxClientMessageSize+1)
+		}
+		data, err := io.ReadAll(payload)
+		if state&ws.StateServerSide != 0 && len(data) > maxClientMessageSize {
+			return nil, header.OpCode, errClientMessageTooLarge
 		}
 
 		return data, header.OpCode, err
